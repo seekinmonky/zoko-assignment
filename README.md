@@ -22,8 +22,8 @@ A simple backend API for text-based messaging with asynchronous message processi
    ```
    POSTGRES_HOST=localhost
    POSTGRES_PORT=5432
-   POSTGRES_USER=postgres
-   POSTGRES_PASSWORD=postgres
+   POSTGRES_USER=instalane
+   POSTGRES_PASSWORD=""
    POSTGRES_DB=messages
    REDIS_ADDR=localhost:6379
    REDIS_PASSWORD=
