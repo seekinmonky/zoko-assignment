@@ -27,7 +27,7 @@ func NewMessageHandler(db *db.DB, queue *queue.RedisQueue) *MessageHandler {
 func (h *MessageHandler) SendMessage(c *gin.Context) {
 	var req models.MessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		HandleValidationErrors(c, err)
 		return
 	}
 
@@ -36,7 +36,7 @@ func (h *MessageHandler) SendMessage(c *gin.Context) {
 
 	// Enqueue the message for asynchronous processing
 	if err := h.queue.EnqueueMessage(msg); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue message"})
+		RespondWithError(c, http.StatusInternalServerError, "QUEUE_ERROR", "Failed to enqueue message", nil)
 		return
 	}
 
@@ -49,13 +49,22 @@ func (h *MessageHandler) GetConversation(c *gin.Context) {
 	user2 := c.Query("user2")
 
 	if user1 == "" || user2 == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Both user1 and user2 parameters are required"})
+		field := "user2"
+		if user1 == "" {
+			field = "user1"
+		}
+
+		details := map[string]string{
+			"field":  field,
+			"reason": "required",
+		}
+		RespondWithError(c, http.StatusBadRequest, "MISSING_REQUIRED_PARAMETER", "Both user1 and user2 parameters are required", details)
 		return
 	}
 
 	messages, err := h.db.GetConversation(user1, user2)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve conversation"})
+		RespondWithError(c, http.StatusInternalServerError, "DATABASE_ERROR", "Failed to retrieve conversation", nil)
 		return
 	}
 
@@ -67,12 +76,20 @@ func (h *MessageHandler) MarkMessageAsRead(c *gin.Context) {
 	messageID := c.Param("message_id")
 
 	if messageID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Message ID is required"})
+		details := map[string]string{
+			"field":  "message_id",
+			"reason": "required",
+		}
+		RespondWithError(c, http.StatusBadRequest, "MISSING_REQUIRED_PARAMETER", "Message ID is required", details)
 		return
 	}
 
 	if err := h.db.MarkMessageAsRead(messageID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if err.Error() == "message with ID "+messageID+" not found" {
+			RespondWithError(c, http.StatusNotFound, "MESSAGE_NOT_FOUND", "Message not found", nil)
+			return
+		}
+		RespondWithError(c, http.StatusInternalServerError, "DATABASE_ERROR", "Failed to mark message as read", nil)
 		return
 	}
 
