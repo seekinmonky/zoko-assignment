@@ -74,7 +74,10 @@ func (q *RedisQueue) StartWorker() {
 			// Save the message to the database
 			if err := q.db.SaveMessage(msg); err != nil {
 				log.Printf("Error saving message to database: %v", err)
-				// In a production system, you might want to requeue the message or handle the error differently
+				// Requeue the message
+				if requeueErr := q.EnqueueMessage(msg); requeueErr != nil {
+					log.Printf("Failed to requeue message: %v", requeueErr)
+				}
 			}
 		}
 	}()
